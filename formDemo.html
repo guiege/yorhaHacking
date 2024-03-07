@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <link rel="stylesheet" href="/MyFirstWebpageP2/styles.css">
+
+</head>
+<body>
+    <ul class="navbar">
+        <li><a href="./">HTML</a></li>
+        <li class="active"><a href="./formDemo.html">Form Demo</a></li>
+    </ul>
+
+    <div>
+        <form id="greetingForm">
+            <label>Greeting:</label>
+            <input type="text" id="userGreeting" required/>
+            <input type="submit" />
+        </form>
+    </div>
+    <p id="result">No submission</p>
+
+    <div>
+        <form id="otherForm">
+            <label>Do you have coffee?</label>
+            <input type="radio" name="coffee" id="yes-coffee"/>
+            <label for="yes-coffee">Yes</label>
+            <input type="radio" name="coffee" id="no-coffee"/>
+            <label for="no-coffee">No</label>
+            <input type="submit" />
+        </form>
+    </div>
+
+    <div>
+        <form>
+            <label>Select the colors you like:</label>
+            <input type="checkbox" id="color-red" name="colors[]" value="red" />
+            <label for="color-red">Red</label>
+            <input type="checkbox" id="color-blue" name="colors[]" value="blue" />
+            <label for="color-blue">Blue</label>
+            <input type="checkbox" id="color-green" name="colors[]" value="green" />
+            <label for="color-green">Green</label>
+            <input type="submit" />
+        </form>
+    </div>
+
+    <div>
+        <form>
+            <label for="icecream">Select your favorite ice-cream flavor:</label>
+            <select id="icecream" name="icecream" required>
+                <option value="empty"></option>
+                <option value="chocolate">Chocolate</option>
+                <option value="vanilla">Vanilla</option>
+                <option value="candc">Cookies and Cream</option>
+            </select>
+            <input type="submit" />
+        </form>
+    </div>
+    <br />
+    <div>
+        <form action="somescript" method="post"> <!-- USE POST FOR SENSITIVE INFORMATION-->
+        <!--Note: This won't work unless your server is configured to handle post requests.-->
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" />
+            <br />
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" />
+            <br />
+            <input type="submit" />
+        </form>
+    </div>
+
+
+    <script>
+        document.getElementById('greetingForm').addEventListener('submit', function (event) {
+            event.preventDefault(); //prevent clearing of form
+            var greeting = document.getElementById('userGreeting').value;
+            var result = document.getElementById('result');
+            result.innerHTML = greeting;
+        });
+    </script>
+
+</body>
+</html>
