@@ -27,24 +27,35 @@ currentFrame = 0;
 
 const player = new component(600, 400, 90, 40, "./hackingSprites/cursor.png", 0, 0, type = "player");
 
+const playerIFrames = 120;
+const playerFireCooldownFrames = 6;
+const bulletSpeed = 10;
+
+const enemyBulletSpeed = 6;
+
+enemyBulletSwitchTimer = 0;
+const enemyBulletSwitchInterval = 15;
+enemyBulletColor = "#454138";
+oldEnemyBulletColor = "#F34D08";
+
+
+cameraOffsetX = 0;
+cameraOffsetY = 0;
+
 const playerMaxSpeed = 10;
-const playerAcceleration = 2.5;
+const enemyMaxSpeed = 3;
+
+const playerAcceleration = 1.5;
 const playerDeceleration = 3;
-playerHealth = 5;
+playerHealth = 4;
 curPlayerIFrames = 0;
-const playerIFrames = 30;
-const playerFireCooldownFrames = 2;
-const enemyFireCooldownFrames = 5;
 currentEnemyCooldownFrames = 0;
-const bulletSpeed = 12;
-const enemyBulletSpeed = 10;
 const enemySize = 60;
 
 currentCooldownFrames = 0;
-
-const obstacles = [];
 const playerBullets = [];
 enemyBullets = [];
+const walls = [];
 const enemies = [];
 
 const levelTransitionTimer = 60;
@@ -64,13 +75,13 @@ const gameArea = {
         this.canvas.height = 800;
         this.canvas.style.backgroundColor = "#c2bda6";
         this.context = this.canvas.getContext("2d");
-        document.body.insertBefore(this.canvas, document.getElementById("clockCanvas"));
-        document.body.insertBefore(document.createElement("br"), document.getElementById("clockCanvas"));
+        document.body.insertBefore(this.canvas, document.getElementById("canvas"));
+        document.body.insertBefore(document.createElement("br"), document.getElementById("canvas"));
 
         this.frameCount = 0;
         this.mouseDown = false;
         this.score = 0;
-        this.scoreText = new component(10, 30, "25px", "Consolas", "white", 0, 0, type = "text");
+        this.scoreText = new component(300, 380, "25px", "Consolas", "white", 0, 0, type = "text");
         this.scoreText.text = "Score: " + this.score;
 
         //for key presses
@@ -112,7 +123,6 @@ const gameArea = {
     },
 
     update: function () {
-        console.log(playerBullets.length);
         this.frameCount += 1;
         //clears the background
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -135,7 +145,8 @@ const gameArea = {
                 player.vy += playerAcceleration * ((d-u)/magnitude);
             }
 
-             if((r - l) == 0){
+
+            if((r - l) == 0){
                 if(player.vx > 0){
                     if(player.vx - playerDeceleration >= 0)
                         player.vx -= playerDeceleration;
@@ -181,20 +192,15 @@ const gameArea = {
 
             if (gameArea.mouseX && gameArea.mouseY) {
                 //player faces mouse cursor
-                direction = [gameArea.mouseX - player.x, gameArea.mouseY - player.y];
+                direction = [(gameArea.mouseX) - player.x, (gameArea.mouseY) - player.y];
                 player.angle = Math.atan(direction[1] / direction[0]);
                 if(Math.sign(gameArea.mouseX - player.x) == -1){
-                    player.image.src = "./hackingSprites/cursorflp.png";
+                    player.image.src = "./hackingSprites/cursorflp" + playerHealth + ".png";
                 }
                 else{
-                    player.image.src = "./hackingSprites/cursor.png";
+                    player.image.src = "./hackingSprites/cursor" + playerHealth + ".png";
                 }
     
-            }
-    
-            for(e in obstacles)
-            {
-                player.collideWith(e)
             }
             
         }
@@ -224,54 +230,92 @@ const gameArea = {
         }
     },
 
+    createEnemy: function(health, pathing, eType, cooldown, startX, startY, enemySpeed = 20, enemySpread = 360) {
+        sprite = "./hackingSprites/enemy.png";
+        if(pathing == "pursue")
+            sprite = "./hackingSprites/pursuer.png";
+        enemy = new component(startX, startY, enemySize, enemySize, sprite, 0, 0, type = "enemy");
+        enemy.health = health;
+        enemy.enemyPathing = pathing;
+        enemy.enemyType = eType;
+        enemy.startX = startX;
+        enemy.startY = startY;
+        enemy.enemyFireCooldownFrames = cooldown;
+        enemy.enemySpeed = enemySpeed;
+        enemy.enemySpread = enemySpread;
+
+        return enemy;
+    },
+
     reset: function () {  
         clearInterval(gameInterval);
         currentFrame = 0;
         gameOver = false;
 
+        cameraOffsetX = 0;
+        cameraOffsetY = 0;
+
         enemies.length = 0;
         enemyBullets.length = 0;
         currentEnemyCooldownFrames = 0;
 
-        enemy = new component(0, 100, enemySize, enemySize, "./hackingSprites/enemy.png", 0, 0, type = "image");
-        enemy.health = 20;
-        enemy.enemyPathing = "cosX";
-        enemy.enemyType = "trishot";
-        enemy.startX = 400;
-        enemy.startY = 100;
-
-        enemy2 = new component(100, 500, enemySize, enemySize, "./hackingSprites/enemy.png", 0, 0, type = "image");
-        enemy2.health = 20;
-        enemy2.enemyPathing = "circle";
-        enemy2.enemyType = "diagonals";
-        enemy2.startX = 400;
-        enemy2.startY = 400;
-
-        enemy3 = new component(400, 400, enemySize, enemySize, "./hackingSprites/enemy.png", 0, 0, type = "image");
-        enemy3.health = 20;
-        //enemy3.enemyPathing = "cosX";
-        enemy3.enemyType = "rotcurved";
-        enemy3.startX = 400;
-        enemy3.startY = 400;
-
-
+        levelTransitionFrame = 0;
 
         switch(currentLevel)
         {
             case 0:
-                enemies.push(enemy3);
+                enemies.push(this.createEnemy(10, "cosX", "trishot", 60, 400, 100, 40, 360));
+                // enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 700, 350));
+                // enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 500, 500));
                 break;
             case 1:
-                enemies.push(enemy2);
+                enemies.push(this.createEnemy(15, "wavy", "trishot", 50, 400, 150, 40, 360));
                 break;
             case 2:
-                enemies.push(enemy);
-                enemies.push(enemy2);
+                enemies.push(this.createEnemy(25, "pursue", "hexashot", 20 , 400, 50));
                 break;
             case 3:
-                enemies.push(enemy);
-                gameArea.scoreText.text = "You Did It!";
+                enemies.push(this.createEnemy(25, "", "rotcurved", 3, 400, 400));
                 break;
+            case 4:
+                enemies.push(this.createEnemy(25, "circle", "rotcurved", 40, 400, 400, 40, 360));
+                break;
+            case 5:
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 600, 150));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 200, 150));
+                break;
+
+            case 6:
+                enemies.push(this.createEnemy(10, "cosX", "trishot", 60, 400, 100, 40, 360));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 600, 350));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 200, 500));
+
+                break;
+            case 7:
+                enemies.push(this.createEnemy(25, "", "rotcurved", 20, 250, 250, 40, 360));
+                enemies.push(this.createEnemy(25, "", "rotcurvedopposite", 20, 550, 550, 40, 360));
+                break;
+            case 8:
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 200, 200));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 600, 200));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 200, 600));
+                enemies.push(this.createEnemy(10, "pursue", "playershot", 60, 600, 600));
+                break;
+            case 9:
+                enemies.push(this.createEnemy(15, "", "", 60, 400, 150));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 480, 180));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 400, 200));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 320, 180));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 240, 160));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 560, 160));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 640, 140));
+                enemies.push(this.createEnemy(15, "pursue", "", 60, 160, 140));
+                break;
+            case 10:
+                enemies.push(this.createEnemy(15, "", "", 60, 1000, 1050));
+                this.scoreText.text = "HACKING COMPLETE";
+                break;
+
         }
 
         playerBullets.length = 0;
@@ -280,7 +324,9 @@ const gameArea = {
         this.scoreText.text = "";
         player.x = 400;
         player.y = 600;
-        playerHealth = 5;
+        playerHealth = 4; 
+        enemyBulletSwitchTimer = 0;
+        enemyBulletColor = "#454138";
         playerShotSfx.sound.volume = 0.25;
         playerHitSfx.sound.volume = 0.25;
 
@@ -299,35 +345,90 @@ function component(x, y, width, height, color, vx = 0, ay = 0, type = "rect", an
     this.ay = ay;
     this.type = type;
     this.angle = angle;
+    this.displayAngle = 0;
     this.text = "";
     this.enemyPathing = "";
     this.enemyType = "";
+    this.enemyCooldown = 30;
+    this.enemyFireCooldownFrames = 20;
+    this.currentEnemyCooldownFrames = 0;
+    this.enemySwitchRate = 0;
+    this.enemySpread = 0;
+    this.enemySpeed = 0;
+
     this.startX;
     this.startY;
 
     this.health = 0;
-    if (this.type === "image" || this.type === "player") {
+    if (this.type === "image" || this.type === "player" || this.type === "enemy") {
         this.image = new Image();
         this.image.src = color; //color will represent the path to the image file
     }
 
+    this.move = function(vx, vy){
+        canMoveX = true;
+        canMoveY = true;
+        if(this.type == "player"){
+            tempPlayer = new component(player.x + vx, player.y + vy, 90, 40, "", 0, 0, type = "player");
+
+            if(this.x + vx > 800 || this.x + vx < 0)
+                 canMoveX = false;
+            if(this.y + vy > 800 || this.y + vy < 0)
+                 canMoveY = false;
+
+            for (let i = 0; i < walls.length; i++) {
+                if(tempPlayer.collideWith(walls[i])){
+                    canMoveX = false;
+                    canMoveY = false;
+                }
+            }
+
+            
+        }
+
+        if(this.type === "enemy"){
+            tempEnemy = new component(this.x + vx, this.y + vy, enemySize/3, enemySize/3, "", 0, 0, type = "enemy");
+            tempPlayer = new component(player.x + vx, player.y + vy, 90, 40, "", 0, 0, type = "player");
+            tempPlayer.angle = player.angle;
+            for (let i = 0; i < enemies.length; i++) {
+                if(enemies[i] != this){
+                    if(tempEnemy.collideWith(enemies[i]) == 1){
+                        canMoveX = false;
+                        canMoveY = false;
+                    }
+                    if(tempEnemy.collideWith(tempPlayer) == 1){
+                        canMoveX = false;
+                        canMoveY = false;
+                    }
+                }
+            }
+        }
+
+        if(canMoveX)
+            this.x += vx;
+        if(canMoveY)
+            this.y += vy;
+    }
+
     this.update = function() {
         //movement
-        this.vy += this.ay;
-        this.x += this.vx;
-        this.y += this.vy;
+        
+
+        this.move(this.vx, this.vy);
 
         //redraws itself
         let ctx = gameArea.context;
-        if (type === "rect") {
+        if (this.type === "rect") {
             ctx.save();
+            //ctx.translate(this.x - (cameraOffsetX- 400), this.y - (cameraOffsetY- 400));
             ctx.translate(this.x, this.y);
             ctx.rotate(this.angle);
             ctx.fillStyle = color;
             ctx.fillRect(this.width / -2, this.height / -2, this.width, this.height);
             ctx.restore();
-        } else if (type === "player") {
+        } else if (this.type === "player") {
             ctx.save();
+            //ctx.translate(this.x - (cameraOffsetX- 400), this.y - (cameraOffsetY- 400));
             ctx.translate(this.x, this.y);
             ctx.rotate(this.angle);
             ctx.drawImage(this.image, this.width / -2, this.height / -2, this.width, this.height);
@@ -335,11 +436,16 @@ function component(x, y, width, height, color, vx = 0, ay = 0, type = "rect", an
         } else if (this.type === "text") {
             ctx.font = this.width + " " + this.height;
             ctx.fillStyle = color;
-            ctx.fillText(this.text, this.x, this.y);
-        } else if (this.type === "image") {
+            //ctx.fillText(this.text, this.x - (cameraOffsetX- 400), this.y - (cameraOffsetY- 400));
+            ctx.fillText(this.text, this.x , this.y);
+        } else if (this.type === "image" || this.type === "enemy") {
             ctx.save();
+            //ctx.translate(this.x - (cameraOffsetX- 400), this.y - (cameraOffsetY- 400));
             ctx.translate(this.x, this.y);
-            ctx.rotate(this.angle);
+            if(this.displayAngle != 0)
+                ctx.rotate(this.displayAngle);
+            else
+                ctx.rotate(this.angle);
             ctx.drawImage(this.image, this.width / -2, this.height / -2, this.width, this.height);
             ctx.restore();
         }
@@ -376,7 +482,7 @@ function component(x, y, width, height, color, vx = 0, ay = 0, type = "rect", an
         return { min, max };
     }
 
-    // Helper function to check if two rotated rectangles intersect using the Separating Axis Theorem
+    // Helper function to check if two rotated rectangles intersect using SAT
     function intersectRotatedRects(rect1, rect2) {
         const axes = [
             [1, 0], // X-axis
@@ -420,13 +526,35 @@ function updateGame() {
 
     if(curPlayerIFrames > 0)
         curPlayerIFrames--;
-    
-    if(currentEnemyCooldownFrames > enemyFireCooldownFrames)
-        currentEnemyCooldownFrames = 0;
-    else
-        currentEnemyCooldownFrames++;
 
-    if(playerHealth <= 0){
+    playerToCamera = [player.x - cameraOffsetX, player.y - cameraOffsetY];
+    if(playerToCamera[0] > 0){
+        cameraOffsetX += playerToCamera[0]/5;
+    } else if(playerToCamera[0] < 0){
+        cameraOffsetX += playerToCamera[0]/5;
+    }
+    if(playerToCamera[1] > 0){
+        cameraOffsetY += playerToCamera[1]/5;
+    } else if(playerToCamera[1] < 0){
+        cameraOffsetY += playerToCamera[1]/5;
+    }
+    
+
+    
+
+    if(enemyBulletSwitchTimer > enemyBulletSwitchInterval){
+        if(enemyBulletColor == "#454138"){
+            enemyBulletColor = "#F34D08"
+            oldEnemyBulletColor = "#454138"
+        }
+        else{
+            enemyBulletColor = "#454138";
+            oldEnemyBulletColor = "#F34D08"
+        }
+        enemyBulletSwitchTimer = 0;
+    } 
+
+    if(playerHealth == 0){
         playerExplodeSfx.play();
         stopGame();
     }
@@ -434,19 +562,30 @@ function updateGame() {
     if(enemyBullets.length > 0){
         for (let i = 0; i < enemyBullets.length; i++) {
             enemyBullets[i].update();
+            
             if(enemyBullets[i].collideWith(player))
             {
                 enemyBullets.splice(i, 1);
                 gameArea.playerHit();
             }
-            if(playerBullets.length > 0)
-            {
-                for (let j = 0; j < playerBullets.length; j++) {
-                    if(playerBullets[j].collideWith(enemyBullets[i]) == 1){
-                        enemyBullets.splice(i, 1);
-                        playerBullets.splice(j, 1);
-                    }
-                }
+            for (let j = 0; j < walls.length; j++) {
+                if(enemyBullets[i].collideWith(walls[j]))
+                    enemyBullets.splice(i, 1);
+            }
+        
+        }
+    }
+
+    for (let i = 0; i < walls.length; i++) {
+        walls[i].update();
+    }
+
+    for (let i = 0; i < playerBullets.length; i++) {
+        for (let j = 0; j < enemyBullets.length; j++) {
+            if(playerBullets[i].collideWith(enemyBullets[j]) == 1){
+                if(enemyBullets[j].color == "#F34D08")
+                    enemyBullets.splice(j, 1);
+                
             }
         }
     }
@@ -459,7 +598,8 @@ function updateGame() {
     if(playerBullets.length > 0){
         for (let i = 0; i < playerBullets.length; i++) {
             playerBullets[i].update();
-            if(playerBullets[i].x >= 800 || playerBullets.x <= 0 || playerBullets[i].y >= 800 || playerBullets[i].y <= 0){
+            //if(playerBullets[i].x >= (800 + cameraOffsetX) || playerBullets.x <= (0 + cameraOffsetX) || playerBullets[i].y >= (800 + cameraOffsetY) || playerBullets[i].y <= (0 - cameraOffsetY) ){
+            if(playerBullets[i].x >= 800  || playerBullets.x <= 0  || playerBullets[i].y >= 800 || playerBullets[i].y <= 0  ){
                 playerBullets.splice(i, 1);
                 break;
             }
@@ -482,35 +622,59 @@ function updateGame() {
 
         for (let i = 0; i < enemies.length; i++) {
 
+            if(enemies[i].currentEnemyCooldownFrames > enemies[i].enemyFireCooldownFrames)
+                enemies[i].currentEnemyCooldownFrames = 0;
+            
+                
+            
+            enemies[i].currentEnemyCooldownFrames++;
+
             switch (enemies[i].enemyPathing) {
                 case "circle":
-                    enemies[i].x = enemies[i].startX + 360*(Math.cos(currentFrame/60));
-                    enemies[i].y = enemies[i].startY + 360*(Math.sin(currentFrame/60));
+                    enemies[i].x = enemies[i].startX + enemies[i].enemySpread*(Math.cos(currentFrame/enemies[i].enemySpeed));
+                    enemies[i].y = enemies[i].startY + enemies[i].enemySpread*(Math.sin(currentFrame/enemies[i].enemySpeed));
+                    break;
+                case "wavy":
+                    enemies[i].x = enemies[i].startX + enemies[i].enemySpread*(Math.cos(currentFrame/enemies[i].enemySpeed));
+                    enemies[i].y = enemies[i].startY + (Math.sin(currentFrame/enemies[i].enemySpeed) * Math.cos(currentFrame/enemies[i].enemySpeed) * 200);
                     break;
                 case "sinX":
-                    enemies[i].x = enemies[i].startX + 360*(Math.sin(currentFrame/60));
+                    enemies[i].x = enemies[i].startX + enemies[i].enemySpread*(Math.sin(currentFrame/enemies[i].enemySpeed));
                     break;
                 case "cosX":
-                    enemies[i].x = enemies[i].startX + 360*(Math.cos(currentFrame/60));
+                    enemies[i].x = enemies[i].startX + enemies[i].enemySpread*(Math.cos(currentFrame/enemies[i].enemySpeed));
+                    break;
+		        case "pursue":
+                    direction = [player.x - enemies[i].x, player.y - enemies[i].y];
+                    magnitude = Math.sqrt(direction[0]*direction[0] + direction[1]*direction[1]);
+                    normalizedDx = direction[0]/magnitude;
+                    normalizedDy = direction[1]/magnitude;
+                    enemies[i].displayAngle = Math.atan(direction[1] / direction[0]);
+                    if(enemies[i].x > player.x)
+                        enemies[i].image.src = "./hackingSprites/pursuerflp.png";
+                    else
+                        enemies[i].image.src = "./hackingSprites/pursuer.png";
+                    enemies[i].move(enemyMaxSpeed * normalizedDx, enemyMaxSpeed * normalizedDy);
                     break;
               }
 
-              if(currentEnemyCooldownFrames > enemyFireCooldownFrames){
+              if(enemies[i].currentEnemyCooldownFrames > enemies[i].enemyFireCooldownFrames){
+                enemyBulletSwitchTimer++;
                 switch (enemies[i].enemyType) {
                     case "diagonals":
-                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b1.vx = enemyBulletSpeed;
                         b1.vy = enemyBulletSpeed;
                 
-                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b2.vx = -enemyBulletSpeed;
                         b2.vy = -enemyBulletSpeed;
                 
-                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b3.vx = enemyBulletSpeed;
                         b3.vy = -enemyBulletSpeed;
                 
-                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b4.vx = -enemyBulletSpeed;
                         b4.vy = enemyBulletSpeed;
 
@@ -522,15 +686,15 @@ function updateGame() {
                         break;
 
                     case "trishot":
-                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
                         b1.vx = Math.sin(0.61) * -enemyBulletSpeed;
                         b1.vy = Math.cos(0.61) * enemyBulletSpeed;
                 
-                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
                         b2.vx = Math.sin(0.61) * enemyBulletSpeed;
                         b2.vy = Math.cos(0.61) * enemyBulletSpeed;
                 
-                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
                         b3.vy = enemyBulletSpeed;
 
                         enemyBullets.push(b1);
@@ -539,19 +703,19 @@ function updateGame() {
                         break;
 
                     case "rotcurved":
-                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
                         b1.vx = Math.cos(currentFrame/60) * enemyBulletSpeed;
                         b1.vy = Math.sin(currentFrame/60) * enemyBulletSpeed;
                 
-                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
                         b2.vx = Math.cos(currentFrame/60) * -enemyBulletSpeed;
                         b2.vy = Math.sin(currentFrame/60) * -enemyBulletSpeed;
                 
-                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b3.vx = Math.sin(currentFrame/60) * enemyBulletSpeed;
                         b3.vy = Math.cos(currentFrame/60) * -enemyBulletSpeed;
                 
-                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "orange");
+                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
                         b4.vx = Math.sin(currentFrame/60) * -enemyBulletSpeed;
                         b4.vy = Math.cos(currentFrame/60) * enemyBulletSpeed;
 
@@ -560,7 +724,73 @@ function updateGame() {
                         enemyBullets.push(b2);
                         enemyBullets.push(b3);
                         enemyBullets.push(b4);
-                        break;        
+                        break; 
+                    case "rotcurvedopposite":
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b1.vx = Math.cos(currentFrame/60) * enemyBulletSpeed;
+                        b1.vy = Math.sin(currentFrame/60) * enemyBulletSpeed;
+                        
+                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b2.vx = Math.cos(currentFrame/60) * -enemyBulletSpeed;
+                        b2.vy = Math.sin(currentFrame/60) * -enemyBulletSpeed;
+                        
+                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
+                        b3.vx = Math.sin(currentFrame/60) * enemyBulletSpeed;
+                        b3.vy = Math.cos(currentFrame/60) * -enemyBulletSpeed;
+                        
+                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "#454138");
+                        b4.vx = Math.sin(currentFrame/60) * -enemyBulletSpeed;
+                        b4.vy = Math.cos(currentFrame/60) * enemyBulletSpeed;
+                        
+                        enemyBullets.push(b1);
+                        enemyBullets.push(b2);
+                        enemyBullets.push(b3);
+                        enemyBullets.push(b4);
+                        break;            
+                    case "hexashot":
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b1.vx = enemyBulletSpeed;
+                
+                        b2 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b2.vx = -enemyBulletSpeed;
+                
+                        b3 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b3.vx = Math.sin(2.36) * enemyBulletSpeed;
+                        b3.vy = Math.cos(2.36) * enemyBulletSpeed;
+                
+                        b4 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b4.vx = Math.sin(0.79) * enemyBulletSpeed;
+                        b4.vy = Math.cos(0.79) * enemyBulletSpeed;
+
+                        b5 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b5.vx = Math.sin(3.93) * enemyBulletSpeed;
+                        b5.vy = Math.cos(3.93) * enemyBulletSpeed;
+
+                        b6 = new component(enemies[i].x, enemies[i].y, 30, 30, "#F34D08");
+                        b6.vx = Math.sin(5.5) * enemyBulletSpeed;
+                        b6.vy = Math.cos(5.5) * enemyBulletSpeed;
+
+                        enemyBullets.push(b1);
+                        enemyBullets.push(b2);
+                        enemyBullets.push(b3);
+                        enemyBullets.push(b4);
+                        enemyBullets.push(b5);
+                        enemyBullets.push(b6);
+                        break;
+
+                    case "playershot":
+                        direction = [player.x - enemies[i].x, player.y - enemies[i].y];
+                        magnitude = Math.sqrt(direction[0]*direction[0] + direction[1]*direction[1]);
+                        normalizedDx = direction[0]/magnitude;
+                        normalizedDy = direction[1]/magnitude;
+
+                        b1 = new component(enemies[i].x, enemies[i].y, 30, 30, enemyBulletColor);
+                        b1.vx = enemyBulletSpeed * normalizedDx;
+                        b1.vy = enemyBulletSpeed * normalizedDy;
+
+                        enemyBullets.push(b1);
+                        break;
+
                 }
             }
             if(enemies[i].collideWith(player) == 1){
@@ -589,7 +819,7 @@ function updateGame() {
 
         if(levelTransitionFrame > levelTransitionTimer){
             gameArea.reset();
-            gameArea.startGame();
+            startGame();
         }
     }
 
@@ -602,5 +832,3 @@ function movePlayer(vx, vy) {
 }
 
 window.onload = gameArea.setup();
-
-
